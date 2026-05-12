@@ -1,0 +1,24 @@
+# Python build / packaging
+*.egg-info/
+*.egg
+build/
+dist/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Virtualenvs
+.venv/
+venv/
+env/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Local config / secrets — should never appear in this repo
+.env
+.env.*
+!.env.example

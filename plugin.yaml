@@ -1,0 +1,30 @@
+# Hermes Agent plugin manifest.
+#
+# For pip-installed plugins the entry-point group in pyproject.toml drives
+# discovery; this manifest carries metadata (declared hooks, required env)
+# that some Hermes tooling reads for the `hermes plugins list` UI and the
+# `hermes plugins install` interactive prompts.
+name: hermes-git-sync
+version: 0.0.1
+description: Two-way git sync of HERMES_HOME, with optional SOPS-encrypted secrets.
+author: Tristan Escalada
+
+provides_tools: []
+provides_hooks:
+  - on_session_start
+  - on_session_end
+
+requires_env:
+  - name: HERMES_SYNC_REMOTE
+    description: "Git remote URL for the state repo (e.g. git@git.example.com:user/hermes-state.git)"
+
+  - name: HERMES_SYNC_BRANCH
+    description: "Branch this Hermes instance owns. Default: hermes/main"
+
+  - name: HERMES_SYNC_SSH_KEY
+    description: "Path to SSH deploy key inside the container, mounted from outside HERMES_HOME"
+    secret: true
+
+  - name: SOPS_AGE_KEY_FILE
+    description: "Path to age private key file (required if .sops.yaml has any creation_rules)"
+    secret: true

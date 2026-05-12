@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hermes-git-sync"
+version = "0.0.1"
+description = "Two-way git sync of HERMES_HOME for Hermes Agent, with optional SOPS-encrypted secrets."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Tristan Escalada" }]
+requires-python = ">=3.10"
+keywords = ["hermes", "hermes-agent", "plugin", "git", "sync", "sops", "age"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+# Runtime dependencies (deliberately minimal; the plugin shells out to system
+# `git` and `sops` binaries — both must be available on PATH at runtime).
+dependencies = [
+    "PyYAML>=6.0",   # for parsing .sops.yaml
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0",
+    "ruff>=0.15",
+]
+
+[project.urls]
+Homepage      = "https://github.com/tescalada/hermes-git-sync"
+Repository    = "https://github.com/tescalada/hermes-git-sync"
+Issues        = "https://github.com/tescalada/hermes-git-sync/issues"
+"Hermes Agent" = "https://github.com/NousResearch/hermes-agent"
+
+# This entry point is what Hermes' plugin loader discovers. Hermes will
+# import the named package and call its register(ctx) function at startup.
+[project.entry-points."hermes_agent.plugins"]
+hermes-git-sync = "hermes_git_sync"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hermes_git_sync"]
