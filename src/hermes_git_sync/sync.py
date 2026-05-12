@@ -16,7 +16,6 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Optional
 
 from . import git_ops, sops_ops
 
@@ -42,7 +41,7 @@ def _write_session_sentinel(home: Path) -> None:
     sentinel.touch()
 
 
-def _session_sentinel_mtime(home: Path) -> Optional[float]:
+def _session_sentinel_mtime(home: Path) -> float | None:
     """Return the sentinel's mtime, or None if it doesn't exist.
 
     A missing sentinel is an abort signal for `on_session_end`: there is no
@@ -148,7 +147,12 @@ def on_session_start(
     logger.info(
         "on_session_start: session=%s branch=%s fetched=%s rebased=%s "
         "decrypted=%d decrypt_failed=%d",
-        session_id, branch, fetched, rebased, decrypted, decrypt_failed,
+        session_id,
+        branch,
+        fetched,
+        rebased,
+        decrypted,
+        decrypt_failed,
     )
 
 
@@ -187,8 +191,7 @@ def on_session_end(
 
     if encrypt_failed > 0:
         logger.warning(
-            "on_session_end: %d encrypt failure(s); aborting commit to avoid "
-            "plaintext leak",
+            "on_session_end: %d encrypt failure(s); aborting commit to avoid plaintext leak",
             encrypt_failed,
         )
         return
@@ -208,8 +211,7 @@ def on_session_end(
 
     if restored_failed > 0:
         logger.warning(
-            "on_session_end: %d restore failure(s); aborting commit to avoid "
-            "plaintext leak",
+            "on_session_end: %d restore failure(s); aborting commit to avoid plaintext leak",
             restored_failed,
         )
         return
@@ -232,7 +234,11 @@ def on_session_end(
             logger.warning("on_session_end: push failed", exc_info=True)
 
     logger.info(
-        "on_session_end: session=%s branch=%s encrypted=%d restored=%d "
-        "committed=%s pushed=%s",
-        session_id, branch, encrypt_ok, restored_ok, committed, pushed,
+        "on_session_end: session=%s branch=%s encrypted=%d restored=%d committed=%s pushed=%s",
+        session_id,
+        branch,
+        encrypt_ok,
+        restored_ok,
+        committed,
+        pushed,
     )

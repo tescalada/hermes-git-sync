@@ -32,9 +32,7 @@ _DETECT_MAX_BYTES = 5 * 1024 * 1024
 # a comment like `# sops_version=...` would otherwise false-positive.
 _ENV_VERSION_PAT = re.compile(r"^sops_version=", re.MULTILINE)
 _ENV_MAC_PAT = re.compile(r"^sops_mac=", re.MULTILINE)
-_ENV_RECIPIENT_PATS = tuple(
-    re.compile(rf"^sops_{k}__", re.MULTILINE) for k in _RECIPIENT_KEYS
-)
+_ENV_RECIPIENT_PATS = tuple(re.compile(rf"^sops_{k}__", re.MULTILINE) for k in _RECIPIENT_KEYS)
 
 
 def _is_encrypted_yaml_or_json_dict(data: object) -> bool:
@@ -134,10 +132,7 @@ def matching_paths(hermes_home: Path, rules: list[dict]) -> list[Path]:
         return []
     matches: list[Path] = []
     for root, dirs, files in os.walk(hermes_home, followlinks=False):
-        dirs[:] = [
-            d for d in dirs
-            if d != ".git" and not (Path(root) / d).is_symlink()
-        ]
+        dirs[:] = [d for d in dirs if d != ".git" and not (Path(root) / d).is_symlink()]
         for fname in files:
             p = Path(root) / fname
             if p.is_symlink():

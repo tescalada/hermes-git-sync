@@ -1,0 +1,10 @@
+# Run `pre-commit install` once after cloning to wire the hooks; then every
+# `git commit` runs ruff (lint + autofix) and ruff-format on the staged files.
+# Bump the pinned versions with `pre-commit autoupdate`.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.12
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format

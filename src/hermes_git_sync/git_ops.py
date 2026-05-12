@@ -18,8 +18,10 @@ logger = logging.getLogger(__name__)
 # Without these, `git commit` fails with "Please tell me who you are" and the
 # surrounding error handler in sync.py swallows the failure as a silent no-op.
 _COMMIT_IDENTITY = [
-    "-c", "user.name=hermes-git-sync",
-    "-c", "user.email=hermes-git-sync@localhost",
+    "-c",
+    "user.name=hermes-git-sync",
+    "-c",
+    "user.email=hermes-git-sync@localhost",
 ]
 
 
@@ -34,9 +36,9 @@ _GIT_ENV_PREFIXES = ("GIT_", "SSH_", "GPG_")
 def _env() -> dict[str, str]:
     """Build env for git, configuring SSH via GIT_SSH_COMMAND when a key is set."""
     env = {
-        k: v for k, v in os.environ.items()
-        if k in _GIT_ENV_ALLOWLIST
-        or any(k.startswith(p) for p in _GIT_ENV_PREFIXES)
+        k: v
+        for k, v in os.environ.items()
+        if k in _GIT_ENV_ALLOWLIST or any(k.startswith(p) for p in _GIT_ENV_PREFIXES)
     }
     ssh_key = os.environ.get("HERMES_SYNC_SSH_KEY")
     if ssh_key:
@@ -74,11 +76,14 @@ def current_branch(cwd: Path) -> str:
 
 
 def ref_exists(cwd: Path, ref: str) -> bool:
-    return run(
-        ["rev-parse", "--verify", "--quiet", ref],
-        cwd=cwd,
-        check=False,
-    ).returncode == 0
+    return (
+        run(
+            ["rev-parse", "--verify", "--quiet", ref],
+            cwd=cwd,
+            check=False,
+        ).returncode
+        == 0
+    )
 
 
 def ensure_branch(cwd: Path, branch: str) -> None:
@@ -114,7 +119,8 @@ def rebase(cwd: Path, upstream: str) -> bool:
     run(["rebase", "--abort"], cwd=cwd, check=False)
     logger.warning(
         "rebase onto %s failed; aborted (rc=%d)",
-        upstream, result.returncode,
+        upstream,
+        result.returncode,
     )
     return False
 
