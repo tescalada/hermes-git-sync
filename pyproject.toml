@@ -28,7 +28,7 @@ dependencies = [
     "PyYAML>=6.0",   # for parsing .sops.yaml
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=9.0",
     "ruff>=0.15",

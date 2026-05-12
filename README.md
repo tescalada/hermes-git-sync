@@ -2,8 +2,6 @@
 
 Two-way git sync of `HERMES_HOME` for [Hermes Agent](https://github.com/NousResearch/hermes-agent), with optional SOPS-encrypted secrets.
 
-> **Status: pre-alpha (v0.0.1).** Scaffold only; hooks load but do nothing yet. See the [Roadmap](#roadmap) for what lands when.
-
 ## What it does
 
 Lets you manage your Hermes config (SOUL.md, USER.md, MEMORY.md, skills, etc.) the way you manage any other code — `git pull`, edit on your laptop, `git push`. The plugin keeps a running Hermes instance in sync with a git remote both directions:
@@ -141,15 +139,6 @@ Recommended deny-by-default policy so new file types Hermes invents don't accide
 ```
 
 `.env` and `auth.json` are reintroduced via SOPS as encrypted (`.env`, `auth.json` — encrypted in place by SOPS, the ciphertext is fine to commit since `.sops.yaml`-matched files are decrypted automatically).
-
-## Roadmap
-
-- [x] **v0.0.1** — Scaffold, hooks registered, no-op bodies
-- [ ] **v0.1.0** — `on_session_end`: commit + push (no encryption)
-- [ ] **v0.2.0** — `on_session_start`: fetch + rebase + reset
-- [ ] **v0.3.0** — SOPS encrypt / decrypt at session boundaries
-- [ ] **v0.4.0** — `.sops.yaml` parsing, multi-recipient handling
-- [ ] **v1.0.0** — Battle-tested
 
 ## License
 

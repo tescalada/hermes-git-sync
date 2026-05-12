@@ -4,9 +4,6 @@ Entry point exposed via the `hermes_agent.plugins` group in pyproject.toml.
 Hermes' plugin loader imports this package and calls `register(ctx)` once
 at startup. `register` wires the session-boundary hooks that do the actual
 sync work in `sync.py`.
-
-v0 status: scaffolding only. Hooks log and return. Real sync logic lives
-in `sync.py` and is filled in incrementally.
 """
 
 import logging
