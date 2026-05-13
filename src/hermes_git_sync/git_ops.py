@@ -2,13 +2,16 @@
 
 We shell out rather than depend on pygit2 / GitPython because:
   - `git` is already in the upstream Hermes Docker image
-  - shelling out gives us full git CLI behavior incl. SSH keys via GIT_SSH_COMMAND
+  - shelling out gives us full git CLI behavior incl. inherited SSH config
   - we don't need fancy in-process git operations
+
+`GIT_`, `SSH_`, and `GPG_` prefixed env vars are forwarded to the git
+subprocess; configure git auth (SSH, `GIT_SSH_COMMAND`, credential helpers)
+in the parent environment.
 """
 
 import logging
 import os
-import shlex
 import subprocess
 from pathlib import Path
 
@@ -28,25 +31,20 @@ _COMMIT_IDENTITY = [
 # Allowlist for the git subprocess environment. Starting from a minimal set
 # (rather than copying the full process env) keeps secrets like
 # `SOPS_AGE_KEY_FILE` out of git's invocations — they'd otherwise be visible
-# to commit hooks, credential helpers, and any tool git execs.
+# to commit hooks, credential helpers, and any tool git execs. `GIT_SSH_COMMAND`
+# (if set in the parent env) passes through via the `GIT_` prefix; that's the
+# documented way callers wire up SSH auth.
 _GIT_ENV_ALLOWLIST = ("PATH", "HOME", "USER", "LANG", "LC_ALL", "TZ", "TERM")
 _GIT_ENV_PREFIXES = ("GIT_", "SSH_", "GPG_")
 
 
 def _env() -> dict[str, str]:
-    """Build env for git, configuring SSH via GIT_SSH_COMMAND when a key is set."""
-    env = {
+    """Build env for git from the allowlist + GIT_/SSH_/GPG_ prefixes."""
+    return {
         k: v
         for k, v in os.environ.items()
         if k in _GIT_ENV_ALLOWLIST or any(k.startswith(p) for p in _GIT_ENV_PREFIXES)
     }
-    ssh_key = os.environ.get("HERMES_SYNC_SSH_KEY")
-    if ssh_key:
-        env["GIT_SSH_COMMAND"] = (
-            f"ssh -i {shlex.quote(ssh_key)} -o IdentitiesOnly=yes "
-            f"-o StrictHostKeyChecking=accept-new"
-        )
-    return env
 
 
 def run(

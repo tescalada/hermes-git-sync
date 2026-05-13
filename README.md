@@ -69,17 +69,14 @@ Set these in your Hermes `.env` (or pass via container env vars):
 |---|---|---|---|
 | `HERMES_SYNC_REMOTE` | yes | — | Git remote URL for the state repo |
 | `HERMES_SYNC_BRANCH` | no | `hermes/main` | Branch this instance owns |
-| `HERMES_SYNC_SSH_KEY` | yes | — | Path to SSH deploy key (inside container) |
 | `SOPS_AGE_KEY_FILE` | only if encrypting | — | Path to age private key (inside container) |
+
+`GIT_`, `SSH_`, and `GPG_` prefixed env vars are forwarded to the git subprocess, so set up SSH (or `GIT_SSH_COMMAND`, or a credential helper) as you would for any other git client.
 
 ### State repo setup
 
 1. Create a private git repo on your preferred git host. Self-hosting keeps your state inside your own network.
-2. Generate an SSH deploy key for it with write access:
-   ```sh
-   ssh-keygen -t ed25519 -f ~/.ssh/hermes_deploy -N ""
-   ```
-   Add the public key (`hermes_deploy.pub`) to the repo's deploy keys list.
+2. Set up SSH (or HTTPS + credential helper) so `git clone <remote>` works without prompting.
 3. Initialize the repo with a `main` branch and the plugin's `.gitignore` and (if using encryption) `.sops.yaml` (see below).
 
 ### Encryption setup (optional but recommended)
