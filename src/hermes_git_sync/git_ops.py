@@ -128,6 +128,21 @@ def reset_hard(cwd: Path) -> None:
     run(["reset", "--hard", "HEAD"], cwd=cwd)
 
 
+def path_in_head(cwd: Path, rel_path: str) -> bool:
+    """True iff `rel_path` exists as a blob in the current HEAD tree.
+
+    Used to distinguish "file exists locally but was never committed" from
+    "file is tracked but the working copy diverges from HEAD". `cat-file -e`
+    exits 0 on hit, 1 on miss, and treats stderr as informational.
+    """
+    result = run(
+        ["cat-file", "-e", f"HEAD:{rel_path}"],
+        cwd=cwd,
+        check=False,
+    )
+    return result.returncode == 0
+
+
 def checkout_path_from_head(cwd: Path, rel_path: str) -> bool:
     """Restore one path in the working tree from HEAD.
 

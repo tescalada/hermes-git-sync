@@ -56,19 +56,30 @@ def _session_sentinel_mtime(home: Path) -> float | None:
 
 
 def _restore_unmodified_secrets(home: Path, since: float) -> tuple[int, int]:
-    """Restore matched files older than `since` to their HEAD form.
+    """Reconcile matched files older than `since` against HEAD.
 
-    Runs after `encrypt_dirty_secrets` in `on_session_end`. Without this pass,
-    `git add -A` in `commit_all` would stage the decrypted plaintext content
-    of secrets the agent didn't touch as a diff against HEAD's encrypted
-    version, leaking those secrets on push. The restore brings them back to
-    their committed (encrypted) form before `commit_all` runs.
+    Runs after `encrypt_dirty_secrets` in `on_session_end`. Two distinct cases
+    need handling here because a "matched but old-mtime" file can be either:
 
-    Encrypt updates the mtime of files it just encrypted to "now" (> `since`),
-    so the restore pass naturally skips them.
+    1. **Tracked in HEAD as ciphertext, decrypted to plaintext by
+       `on_session_start`, and untouched during the session.** `git add -A`
+       in `commit_all` would otherwise stage the plaintext diff against
+       HEAD's ciphertext and publish the secret on push. Restore from HEAD
+       to overwrite the plaintext with the committed ciphertext.
+
+    2. **Not in HEAD at all** — a previously-created plaintext file that
+       matches `.sops.yaml` rules but was never committed (e.g. a new
+       secret the user dropped in between sessions, or a Hermes-written
+       file from before the plugin was active). The restore-from-HEAD
+       path would fail forever. Encrypt the current plaintext in place so
+       `commit_all` adds it as ciphertext.
+
+    Encrypt updates the mtime of files it touches to "now" (> `since`), so
+    the restore pass naturally skips files already handled by
+    `encrypt_dirty_secrets`.
 
     Returns `(succeeded, failed)`. Callers MUST abort `commit_all` when
-    `failed > 0`: a failed restore leaves plaintext in the working tree that
+    `failed > 0`: a failure leaves plaintext in the working tree that
     `git add -A` would otherwise stage and push.
     """
     rules = sops_ops.load_creation_rules(home)
@@ -85,10 +96,27 @@ def _restore_unmodified_secrets(home: Path, since: float) -> tuple[int, int]:
             rel = path.relative_to(home).as_posix()
         except ValueError:
             continue
-        if git_ops.checkout_path_from_head(home, rel):
+
+        if git_ops.path_in_head(home, rel):
+            # Case 1: tracked → restore ciphertext from HEAD.
+            if git_ops.checkout_path_from_head(home, rel):
+                succeeded += 1
+            else:
+                logger.warning("restore failed for %s", path)
+                failed += 1
+            continue
+
+        # Case 2: not in HEAD. If already ciphertext on disk, leave alone;
+        # commit_all will pick it up as a new file. If plaintext, encrypt
+        # in place so the new file commits as ciphertext.
+        if sops_ops.is_encrypted(path):
             succeeded += 1
-        else:
-            logger.warning("restore failed for %s", path)
+            continue
+        try:
+            sops_ops.encrypt_in_place(path)
+            succeeded += 1
+        except Exception:
+            logger.warning("encrypt of new untracked secret failed for %s", path, exc_info=True)
             failed += 1
     return succeeded, failed
 
