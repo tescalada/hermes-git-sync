@@ -113,10 +113,13 @@ def _restore_unmodified_secrets(home: Path, since: float) -> tuple[int, int]:
             succeeded += 1
             continue
         try:
-            sops_ops.encrypt_in_place(path)
+            sops_ops.encrypt_in_place(path, home)
             succeeded += 1
-        except Exception:
-            logger.warning("encrypt of new untracked secret failed for %s", path, exc_info=True)
+        except Exception as e:
+            logger.warning(
+                "encrypt of new untracked secret failed for %s: %s",
+                path, sops_ops._sops_error(e),
+            )
             failed += 1
     return succeeded, failed
 

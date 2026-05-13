@@ -11,6 +11,7 @@ import logging
 import os
 import re
 import subprocess
+import time
 from pathlib import Path
 
 import yaml
@@ -150,22 +151,105 @@ def matching_paths(hermes_home: Path, rules: list[dict]) -> list[Path]:
     return matches
 
 
-def encrypt_in_place(path: Path) -> None:
-    subprocess.run(
-        ["sops", "--encrypt", "--in-place", str(path)],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+# Env-var allowlist for the sops subprocess. Sops honors several env vars
+# that override the loaded config — most consequentially SOPS_AGE_RECIPIENTS
+# (substitutes the recipient set, defeating `--config` pinning) and the
+# SOPS_{KMS,GCP,PGP,AZ_KV,VAULT}_* variants. Inheriting the parent process
+# env would let any caller (or prompt-injected agent shell) override the
+# pinned recipients. Allowlist limits sops to the variables it actually
+# needs: PATH/HOME/locale/etc. for runtime, and SOPS_AGE_KEY{,_FILE} so the
+# decrypt path can find the local age private key.
+_SOPS_SUBPROCESS_ENV_ALLOWLIST = (
+    "PATH", "HOME", "USER", "LANG", "LC_ALL", "TZ", "TERM", "LD_LIBRARY_PATH",
+    "SOPS_AGE_KEY_FILE", "SOPS_AGE_KEY", "SOPS_AGE_KEY_CMD",
+)
 
 
-def decrypt_in_place(path: Path) -> None:
-    subprocess.run(
-        ["sops", "--decrypt", "--in-place", str(path)],
+def _sops_env() -> dict[str, str]:
+    return {k: v for k, v in os.environ.items() if k in _SOPS_SUBPROCESS_ENV_ALLOWLIST}
+
+
+def _dump_stderr_locally(home: Path, stderr: str) -> Path | None:
+    """Persist sops's stderr under `<home>/.git/sops-errors/` (mode 0600).
+
+    Sops's stderr on encrypt/decrypt failures can include snippets of the
+    offending input. Sending it through the structured logger would forward
+    those plaintext snippets to centralized log sinks. Writing it to a
+    restricted-perms file inside `.git/` keeps the diagnostic local to the
+    checkout — operators read it with `cat`, log shippers don't see it,
+    `.git/` is never committed.
+
+    Filename uses `time.time_ns()` (nanosecond precision) so multiple
+    failures within the same wall-clock second don't overwrite each other.
+    Directory is created with `mode=0o700` so the listing (timestamps/pids)
+    isn't world-readable; file contents are also `chmod 0600`. On OSError
+    (disk full, read-only fs, etc.) the function returns None and logs a
+    warning WITHOUT the stderr content — caller still has the diagnostic
+    breadcrumb that the dump itself failed.
+    """
+    if not stderr:
+        return None
+    try:
+        logdir = home / ".git" / "sops-errors"
+        logdir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        # `mkdir(exist_ok=True, mode=...)` doesn't tighten an existing dir's
+        # mode. Apply explicitly so a previously-created looser dir doesn't
+        # leak filenames (timestamps/pids) to other local users.
+        os.chmod(logdir, 0o700)
+        fp = logdir / f"sops-{time.time_ns()}-{os.getpid()}.err"
+        fp.write_text(stderr)
+        os.chmod(fp, 0o600)
+        return fp
+    except OSError as e:
+        # Log only the OSError shape, never the stderr content.
+        logger.warning(
+            "failed to dump sops stderr locally: %s: %s",
+            type(e).__name__, e,
+        )
+        return None
+
+
+def _sops(action: str, path: Path, home: Path) -> None:
+    """Run `sops <action> --in-place <path>` pinned to `<home>/.sops.yaml`.
+
+    `--config` is passed explicitly so sops uses exactly the home-root rules
+    instead of walking up from its CWD (which a nested `.sops.yaml` could
+    shadow). Env is scrubbed via `_SOPS_SUBPROCESS_ENV_ALLOWLIST` so env-var
+    overrides (notably SOPS_AGE_RECIPIENTS) can't substitute recipients out
+    from under the pinned config. `home` is resolved to absolute so a
+    relative HERMES_HOME doesn't silently re-open the CWD-walk failure mode.
+
+    On non-zero exit, stderr is dumped to a local file under `.git/` and a
+    `CalledProcessError` is raised for the caller's normal abort path. The
+    raised exception still carries stderr in its `.stderr` attribute, but
+    callers must NOT log it — they format the failure via `_sops_error`
+    which emits only the returncode.
+    """
+    home = home.resolve()
+    config = home / ".sops.yaml"
+    result = subprocess.run(
+        ["sops", "--config", str(config), action, "--in-place", str(path)],
+        cwd=str(home),
+        env=_sops_env(),
         capture_output=True,
         text=True,
-        check=True,
     )
+    if result.returncode != 0:
+        _dump_stderr_locally(home, result.stderr)
+        raise subprocess.CalledProcessError(
+            result.returncode,
+            result.args,
+            output=result.stdout,
+            stderr=result.stderr,
+        )
+
+
+def encrypt_in_place(path: Path, home: Path) -> None:
+    _sops("--encrypt", path, home)
+
+
+def decrypt_in_place(path: Path, home: Path) -> None:
+    _sops("--decrypt", path, home)
 
 
 def encrypt_dirty_secrets(hermes_home: Path, since: float) -> tuple[int, int]:
@@ -194,11 +278,10 @@ def encrypt_dirty_secrets(hermes_home: Path, since: float) -> tuple[int, int]:
         if is_encrypted(path):
             continue
         try:
-            encrypt_in_place(path)
+            encrypt_in_place(path, hermes_home)
             succeeded += 1
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            rc = getattr(e, "returncode", None)
-            logger.warning("sops encrypt failed for %s (rc=%s)", path, rc)
+            logger.warning("sops encrypt failed for %s: %s", path, _sops_error(e))
             failed += 1
     return succeeded, failed
 
@@ -212,10 +295,25 @@ def decrypt_known_secrets(hermes_home: Path) -> tuple[int, int]:
         if not is_encrypted(path):
             continue
         try:
-            decrypt_in_place(path)
+            decrypt_in_place(path, hermes_home)
             succeeded += 1
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            rc = getattr(e, "returncode", None)
-            logger.warning("sops decrypt failed for %s (rc=%s)", path, rc)
+            logger.warning("sops decrypt failed for %s: %s", path, _sops_error(e))
             failed += 1
     return succeeded, failed
+
+
+def _sops_error(e: Exception) -> str:
+    """Compact error formatter for sops failures.
+
+    Only `rc` is included in the log line. Sops's stderr on encrypt/decrypt
+    failures can echo snippets of the input file content (e.g., YAML parse
+    errors reproduce the offending line). Surfacing stderr through the
+    structured logger would forward those plaintext snippets to whatever
+    centralized log sink the operator ships logs to — a plaintext-leak
+    channel the pre-fix code didn't have. Operators diagnose by reproducing
+    the sops invocation manually with stderr visible on a local terminal.
+    """
+    if isinstance(e, subprocess.CalledProcessError):
+        return f"rc={e.returncode}"
+    return f"{type(e).__name__}: {e}"
