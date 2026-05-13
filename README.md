@@ -47,16 +47,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends sops age \
 
 ### Install the plugin
 
-```sh
-pip install hermes-git-sync
-```
-
-Or from a clone:
+Add it to whichever uv project hosts your Hermes install:
 
 ```sh
-git clone https://github.com/tescalada/hermes-git-sync.git
-cd hermes-git-sync
-pip install -e .
+uv add hermes-git-sync
 ```
 
 Hermes auto-discovers it via the `hermes_agent.plugins` entry-point group on next startup.
