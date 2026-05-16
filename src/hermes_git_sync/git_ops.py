@@ -29,11 +29,12 @@ _COMMIT_IDENTITY = [
 
 
 # Allowlist for the git subprocess environment. Starting from a minimal set
-# (rather than copying the full process env) keeps secrets like
-# `SOPS_AGE_KEY_FILE` out of git's invocations — they'd otherwise be visible
-# to commit hooks, credential helpers, and any tool git execs. `GIT_SSH_COMMAND`
-# (if set in the parent env) passes through via the `GIT_` prefix; that's the
-# documented way callers wire up SSH auth.
+# (rather than copying the full process env) keeps secret-bearing env vars
+# (whatever the deployment uses for credentials, key files, etc.) out of
+# git's invocations — they'd otherwise be visible to commit hooks, credential
+# helpers, and any tool git execs. `GIT_SSH_COMMAND` (if set in the parent
+# env) passes through via the `GIT_` prefix; that's the documented way callers
+# wire up SSH auth.
 _GIT_ENV_ALLOWLIST = ("PATH", "HOME", "USER", "LANG", "LC_ALL", "TZ", "TERM")
 _GIT_ENV_PREFIXES = ("GIT_", "SSH_", "GPG_")
 

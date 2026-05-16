@@ -5,8 +5,8 @@
 # that some Hermes tooling reads for the `hermes plugins list` UI and the
 # `hermes plugins install` interactive prompts.
 name: hermes-git-sync
-version: 0.0.1
-description: Two-way git sync of HERMES_HOME, with optional SOPS-encrypted secrets.
+version: 0.0.2
+description: Two-way git sync of HERMES_HOME.
 author: Tristan Escalada
 
 provides_tools: []
@@ -23,8 +23,4 @@ requires_env:
 
   - name: HERMES_SYNC_SSH_KEY
     description: "Path to SSH deploy key inside the container, mounted from outside HERMES_HOME"
-    secret: true
-
-  - name: SOPS_AGE_KEY_FILE
-    description: "Path to age private key file (required if .sops.yaml has any creation_rules)"
     secret: true
